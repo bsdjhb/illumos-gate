@@ -2,6 +2,7 @@
 
 SUBDIR=	mdb_ks \
 	kernel \
-	kld
+	kld \
+	libavl
 
 .include <bsd.subdir.mk>
