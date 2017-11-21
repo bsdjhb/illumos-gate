@@ -154,6 +154,17 @@ module_load(void *fp, const mdb_map_t *map, const char *fullname)
 {
 	mdb_modload_data_t *mld = fp;
 	const char *name = strbasename(fullname);
+	char name_buf[MAXNAMELEN], *p;
+
+	/*
+	 * A bit of hack: On FreeBSD kernel modules have .ko suffix which needs
+	 * to be stripped before we try to match it with mdb module name for
+	 * purpose of module autoloading (i.e. zfs.ko -> zfs).
+	 */
+	strlcpy(name_buf, name, sizeof (name_buf));
+	name = name_buf;
+	if ((p = strrchr(name, '.')) != NULL && strcmp(p, ".ko") == 0)
+		*p = '\0';
 
 	if (mdb_module_load(name, mld->mld_mode) == 0 && mdb.m_term != NULL) {
 		if (mld->mld_first == TRUE) {
