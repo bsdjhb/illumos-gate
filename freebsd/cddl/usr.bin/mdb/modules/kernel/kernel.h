@@ -41,6 +41,9 @@ typedef struct {
 	const char	*td_lockname;
 	char		td_name[MAXCOMLEN + 1];
 	struct pcb	*td_pcb;
+#if __FreeBSD_version >= 1300015
+	enum td_states	td_state;
+#else
 	enum {
 		TDS_INACTIVE = 0x0,
 		TDS_INHIBITED,
@@ -48,6 +51,7 @@ typedef struct {
 		TDS_RUNQ,
 		TDS_RUNNING
 	} td_state;
+#endif
 	uintptr_t	td_kstack;
 	int		td_kstack_pages;
 	int		td_oncpu;
@@ -59,11 +63,15 @@ typedef struct {
 	struct ucred	*p_ucred;
 	struct pstats	*p_stats;
 	int		p_flag;
+#if __FreeBSD_version >= 1300015
+	enum p_states	p_state;
+#else
 	enum {
 		PRS_NEW = 0,
 		PRS_NORMAL,
 		PRS_ZOMBIE
 	} p_state;
+#endif
 	pid_t		p_pid;
 	struct proc	*p_pptr;
 	u_int		p_lock;
