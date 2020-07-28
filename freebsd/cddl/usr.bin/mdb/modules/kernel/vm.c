@@ -84,7 +84,7 @@ vm_map_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	wsp->walk_data = (void *)wsp->walk_addr;
-	wsp->walk_addr = (uintptr_t)map.header.next;
+	wsp->walk_addr = (uintptr_t)map.header.right;
 
 	return (WALK_NEXT);
 }
@@ -115,7 +115,7 @@ vm_map_walk_step(mdb_walk_state_t *wsp)
 	status = wsp->walk_callback(wsp->walk_addr, tgtentry, wsp->walk_cbdata);
 
 	
-	wsp->walk_addr = (uintptr_t)entry.next;
+	wsp->walk_addr = (uintptr_t)entry.right;
 
 	return (status);
 }
@@ -236,7 +236,6 @@ uma_keg_walk_step(mdb_walk_state_t *wsp)
 
 	status = wsp->walk_callback(wsp->walk_addr, tgtkeg, wsp->walk_cbdata);
 
-	
 	wsp->walk_addr = (uintptr_t)LIST_NEXT(&keg, uk_link);
 
 	return (status);
@@ -247,15 +246,25 @@ uma_keg_walk_fini(mdb_walk_state_t *wsp)
 {
 }
 
+struct uma_domain;
+
 struct slab_walk_state {
 	mdb_uma_keg_t keg;
+	mdb_uma_domain_t dom;
+	int domain_index;
+	struct uma_domain *doms;
 	enum { FREE, FULL, DONE } state;
 };
+
+static int struct_uma_domain_size;
+static int vm_ndomains;
 
 int
 uma_slab_walk_init(mdb_walk_state_t *wsp)
 {
 	struct slab_walk_state *ws;
+	struct uma_domain *doms;
+	size_t size;
 
 	/*
 	 * This walker requires the address of a UMA keg as the
@@ -264,6 +273,34 @@ uma_slab_walk_init(mdb_walk_state_t *wsp)
 	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
+	if (struct_uma_keg_size == 0)
+		struct_uma_keg_size = mdb_type_size("struct uma_keg");
+	if (struct_uma_domain_size == 0)
+		struct_uma_domain_size = mdb_type_size("struct uma_domain");
+
+	if (vm_ndomains == 0) {
+		GElf_Sym sym;
+		unsigned long vm_nd_addr;
+
+		if (mdb_lookup_by_name("vm_ndomains", &sym) == -1)
+			vm_ndomains = 1;
+		else {
+			vm_nd_addr = sym.st_value;
+			if (mdb_ctf_vread(&vm_ndomains,
+				"int", "int", vm_nd_addr, 0) != 0) {
+				vm_ndomains = 1;
+			}
+		}
+	}
+
+	size = struct_uma_domain_size * vm_ndomains;
+	doms = mdb_alloc(size, UM_SLEEP);
+	if (mdb_vread(doms,  size,
+		wsp->walk_addr + struct_uma_keg_size) == -1) {
+		mdb_warn("failed to read struct uma_domain at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
 	if (struct_uma_slab_size == 0)
 		struct_uma_slab_size = mdb_type_size("struct uma_slab");
 	if (struct_uma_slab_size == -1) {
@@ -276,12 +313,26 @@ uma_slab_walk_init(mdb_walk_state_t *wsp)
 	    wsp->walk_addr, 0) == -1) {
 		mdb_warn("failed to read struct uma_keg at %#lr",
 		    wsp->walk_addr);
+		mdb_free(doms, size);
 		mdb_free(ws, sizeof(*ws));
 		return (WALK_ERR);
 	}
 
-	wsp->walk_addr = (uintptr_t)LIST_FIRST(&ws->keg.uk_part_slab);
+	wsp->walk_addr = (uintptr_t)&ws->keg.uk_domain;
+
+	if (mdb_ctf_convert(&ws->dom, "struct uma_domain", "mdb_uma_domain_t",
+	    doms, 0) == -1) {
+		mdb_warn("failed to read struct uma_domain at %#lr",
+		    wsp->walk_addr);
+		mdb_free(doms, size);
+		mdb_free(ws, sizeof(*ws));
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)LIST_FIRST(&ws->dom.ud_part_slab);
 	ws->state = FREE;
+	ws->doms = doms;
+	ws->domain_index = 0;
 	wsp->walk_data = ws;
 
 	return (WALK_NEXT);
@@ -294,22 +345,39 @@ uma_slab_walk_step(mdb_walk_state_t *wsp)
 	uint8_t tgtslab[struct_uma_slab_size];
 	mdb_uma_slab_t slab;
 	int	status;
+	size_t  offset;
 
+again:
 	ws = wsp->walk_data;
 	while (wsp->walk_addr == 0) {
 		switch (ws->state) {
 		case FREE:
 			wsp->walk_addr = (uintptr_t)LIST_FIRST(
-			    &ws->keg.uk_free_slab);
+			    &ws->dom.ud_free_slab);
 			ws->state = FULL;
 			break;
 		case FULL:
 			wsp->walk_addr = (uintptr_t)LIST_FIRST(
-			    &ws->keg.uk_full_slab);
+			    &ws->dom.ud_full_slab);
 			ws->state = DONE;
 			break;
 		default:
-			return (WALK_DONE);
+			ws->domain_index++;
+			if (ws->domain_index == vm_ndomains)
+				return (WALK_DONE);
+
+			offset = struct_uma_domain_size * ws->domain_index;
+			if (mdb_ctf_convert(&ws->dom, "struct uma_domain",
+				"mdb_uma_domain_t",
+				(char *)ws->doms + offset, 0) == -1) {
+				mdb_warn("failed to read struct uma_domain at %#lr",
+				    wsp->walk_addr);
+				return (WALK_DONE);
+			}
+			wsp->walk_addr =
+				(uintptr_t)LIST_FIRST(&ws->dom.ud_part_slab);
+			ws->state = FREE;
+			goto again;
 		}
 	}
 
@@ -328,7 +396,7 @@ uma_slab_walk_step(mdb_walk_state_t *wsp)
 
 	status = wsp->walk_callback(wsp->walk_addr, tgtslab, wsp->walk_cbdata);
 
-	wsp->walk_addr = (uintptr_t)LIST_NEXT(&slab, us_type._us_link);
+	wsp->walk_addr = (uintptr_t)LIST_NEXT(&slab, us_link);
 
 	return (status);
 }
@@ -336,6 +404,11 @@ uma_slab_walk_step(mdb_walk_state_t *wsp)
 void
 uma_slab_walk_fini(mdb_walk_state_t *wsp)
 {
+	struct slab_walk_state *ws;
+	size_t size;
 
-	mdb_free(wsp->walk_data, sizeof(struct slab_walk_state));
+	size = struct_uma_domain_size * vm_ndomains;
+	ws = wsp->walk_data;
+	mdb_free(ws->doms, size);
+	mdb_free(ws, sizeof(struct slab_walk_state));
 }

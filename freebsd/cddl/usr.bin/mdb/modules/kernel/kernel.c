@@ -973,16 +973,18 @@ static int
 kgrep_walk_uma_slab(uintptr_t addr, const void *data, void *private)
 {
 	kgrep_walk_data_t *kwd;
-	mdb_uma_slab_t slab;
 	uintptr_t start;
 
-	if (mdb_ctf_convert(&slab, "struct uma_slab", "mdb_uma_slab_t", data,
-	    0) == -1) {
+	/*
+	 * start is now found in a containing struct as uhs_data
+	 *  which immediately preceeds the slab.
+	*/
+	addr -= sizeof(uintptr_t);
+	if (mdb_ctf_vread(&start, "uintptr_t", "uintptr_t", addr, 0) == -1) {
 		mdb_warn("failed to parse struct uma_slab at %#lr", addr);
 		return (WALK_ERR);
 	}
 
-	start = (uintptr_t)slab.us_data;
 	kwd = private;
 	return (kwd->kg_cb(start, start + PAGE_SIZE, kwd->kg_cbdata));
 }

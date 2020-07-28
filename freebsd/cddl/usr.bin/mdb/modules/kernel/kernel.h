@@ -95,7 +95,7 @@ typedef u_char objtype_t;
 #define MAP_ENTRY_IS_SUB_MAP		0x0002
 
 typedef struct {
-	struct vm_map_entry *next;
+	struct vm_map_entry *right;
 	uintptr_t start;
 	uintptr_t end;
 	union {
@@ -110,22 +110,22 @@ typedef struct {
 	objtype_t type;
 } mdb_vm_object_t;
 
-typedef struct {
-	LIST_HEAD(,uma_slab)	uk_part_slab;
-	LIST_HEAD(,uma_slab)	uk_free_slab;
-	LIST_HEAD(,uma_slab)	uk_full_slab;
 
+typedef struct {
+	LIST_HEAD(,uma_slab)	ud_part_slab;
+	LIST_HEAD(,uma_slab)	ud_free_slab;
+	LIST_HEAD(,uma_slab)	ud_full_slab;
+} mdb_uma_domain_t;
+
+typedef struct {
 	void *uk_allocf;
 
 	LIST_ENTRY(uma_keg)	uk_link;
+	mdb_uma_domain_t uk_domain[0];
 } mdb_uma_keg_t;
 
 typedef struct {
-	union {
-		LIST_ENTRY(uma_slab)	_us_link;
-		unsigned long	_us_size;
-	} us_type;
-	uint8_t		*us_data;
+	LIST_ENTRY(uma_slab)	us_link;
 } mdb_uma_slab_t;
 
 TAILQ_HEAD(pglist, vm_page);
