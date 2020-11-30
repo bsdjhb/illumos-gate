@@ -9,6 +9,7 @@ SHLIBDIR?=	${LIBDIR}/mdb/kvm/${MACHINE_ARCH}
 
 CFLAGS+= -I${LOCAL_CDDL}/sys/cddl/compat/opensolaris \
 	-I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
+	-I${FREEBSD_SRC_DIR}/sys/contrib/openzfs/include \
 	-I${LOCAL_CDDL}/cddl/compat/opensolaris/include \
 	-I${FREEBSD_SRC_DIR}/cddl/compat/opensolaris/include \
 	-I${OPENSOLARIS_USR_DISTDIR}/head \
