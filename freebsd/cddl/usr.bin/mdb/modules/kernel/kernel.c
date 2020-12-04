@@ -63,6 +63,7 @@ static ssize_t struct_proc_size;
 static ssize_t struct_thread_size;
 static uintptr_t prison0_addr;
 static uintptr_t uma_small_alloc_addr;
+static uintptr_t kernel_map_store_addr;
 
 static bool
 jailed(mdb_ucred_t *cred)
@@ -1025,7 +1026,17 @@ kgrep_subr(kgrep_cb_func *cb, void *cbdata)
 	uintptr_t kernel_map;
 	kgrep_walk_data_t kwd;
 
-	if (mdb_readvar(&kernel_map, "kernel_map") == -1) {
+	if (kernel_map_store_addr == 0) {
+		GElf_Sym sym;
+
+		if (mdb_lookup_by_name("kernel_map_store", &sym) == -1)
+			kernel_map_store_addr = (uintptr_t)-1;
+		else
+			kernel_map_store_addr = sym.st_value;
+	}
+	if (kernel_map_store_addr != (uintptr_t)-1)
+		kernel_map = kernel_map_store_addr;
+	else if (mdb_readvar(&kernel_map, "kernel_map") == -1) {
 		mdb_warn("failed to read 'kernel_map'");
 		return (DCMD_ERR);
 	}
