@@ -494,6 +494,8 @@ mdb_create(const char *execname, const char *arg0)
 
 	if (strcmp(strbasename(rootdir), "bin") == 0) {
 		(void) strdirname(rootdir);
+		if (strcmp(strbasename(rootdir), "local") == 0)
+			(void) strdirname(rootdir);
 		if (strcmp(strbasename(rootdir), "usr") == 0)
 			(void) strdirname(rootdir);
 	} else
