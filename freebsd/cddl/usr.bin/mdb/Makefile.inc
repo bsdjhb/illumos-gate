@@ -4,4 +4,6 @@
 CFLAGS+= -D__amd64
 .endif
 
+CFLAGS+= -DIN_BASE
+
 .include "../Makefile.inc"
