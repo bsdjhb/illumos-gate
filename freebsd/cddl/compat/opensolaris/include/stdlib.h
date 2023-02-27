@@ -32,5 +32,6 @@
 #include_next <stdlib.h>
 
 int	fdwalk(int (*func)(void *, int), void *cd);
+#define	getexecname	getprogname
 
 #endif /* !_OPENSOLARIS_STDLIB_H_ */
