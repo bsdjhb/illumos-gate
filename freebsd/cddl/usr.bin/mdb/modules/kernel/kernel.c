@@ -395,8 +395,6 @@ print_thread(uintptr_t addr, const void *data, void *private)
 				else
 					strlcat(state, "D", sizeof(state));
 			}
-			if (TD_IS_SWAPPED(&td))
-				strlcat(state, "W", sizeof(state));
 			if (TD_AWAITING_INTR(&td))
 				strlcat(state, "I", sizeof(state));
 			if (TD_IS_SUSPENDED(&td))

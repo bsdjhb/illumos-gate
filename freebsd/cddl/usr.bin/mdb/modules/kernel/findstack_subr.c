@@ -251,13 +251,6 @@ stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 	fsip->fsi_tstate = thread_state(&td);
 	fsip->fsi_panic = !!(td.td_flags & TDF_INPANIC);
 
-	if (TD_IS_SWAPPED(&td)) {
-		if (print_warnings)
-			mdb_warn("thread %p isn't in memory\n", addr);
-		fsip->fsi_failed = FSI_FAIL_NOTINMEMORY;
-		return (DCMD_ERR);
-	}
-
 	kbase = td.td_kstack;
 	stksz = td.td_kstack_pages * PAGE_SIZE;
 	ktop = kbase + stksz;
