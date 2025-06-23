@@ -30,9 +30,10 @@
 #define	_OPENSOLARIS_SIGNAL_H_
 
 #include_next <signal.h>
-
+#ifndef SIG2STR_MAX
 #define	SIG2STR_MAX	64
 
 int	sig2str(int _signum, char *_str);
+#endif
 
 #endif /* _OPENSOLARIS_SIGNAL_H_ */

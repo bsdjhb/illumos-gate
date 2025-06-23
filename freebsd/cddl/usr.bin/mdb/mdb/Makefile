@@ -7,6 +7,8 @@ LIBDISASM_DIR=	${CDDL_TOP}/usr/src/lib/libdisasm
 LIBSAVEARGS_DIR=${CDDL_TOP}/usr/src/lib/libsaveargs
 DIS_DIR=	${CDDL_TOP}/usr/src/common/dis
 
+OSVERSION!=	awk '/^\#define[[:blank:]]__FreeBSD_version/ {print $$3}' < /usr/include/sys/param.h
+
 PROG=	mdb
 MAN=
 
@@ -145,8 +147,10 @@ SRCS+=	mdb_lex.l \
 
 SRCS+=	\
 	fdwalk.c \
-	proc_str2sig.c \
-	sig2str.c
+	proc_str2sig.c
+.if ${OSVERSION} < 1500047
+SRCS+=	sig2str.c
+.endif
 
 # For the "sys/kern/syscalls.c" include.
 CFLAGS+= -I${FREEBSD_SRC_DIR}
